@@ -46,7 +46,7 @@ async with AsyncRhyme() as client:
 
 ### HTTP client
 
-Both clients use [HTTPX2](https://github.com/pydantic/httpx2); `AsyncRhyme` runs on asyncio or trio. To configure proxies, TLS or connection limits, pass your own `httpx2.Client` (or `httpx2.AsyncClient` for `AsyncRhyme`) as `http_client=`. The SDK doesn't close a client you pass in. Redirects aren't followed: a 3xx raises `APIStatusError`.
+Both clients use [HTTPX2](https://github.com/pydantic/httpx2). To configure proxies, TLS or connection limits, pass your own `httpx2.Client` (or `httpx2.AsyncClient` for `AsyncRhyme`) as `http_client=`. The SDK doesn't close a client you pass in. Redirects aren't followed: a 3xx raises `APIStatusError`.
 
 ## Activities
 
@@ -94,22 +94,16 @@ When a post fails, `add()` and `flush()` raise `rhyme.FlushError`. The underlyin
 - On any other error (network, 5xx, rate limits, auth), nothing is dropped. The unsent activities stay buffered for the next flush.
 - If the `with` block raises, the buffer doesn't flush. The unsent activities stay in it (`len(buffer)`), so you can flush them yourself.
 
-A key can have a lower per-request limit than 100 (see `GET /me`). Size the buffer to match:
-
-```python
-buffer = ActivityBuffer(client, max_items=client.me().limits.max_items)
-```
-
 ## Errors and retries
 
 API, network and configuration errors raise a subclass of `rhyme.RhymeError`. Invalid arguments, such as a malformed `Activity` or an empty batch, raise `ValueError` (pydantic's `ValidationError` is one).
 
 | Exception | When |
 |---|---|
-| `BadRequestError` (400) | Invalid body; see `.details` |
+| `BadRequestError` (400) | Invalid body, e.g. not 1 to 100 activities; see `.details` |
 | `AuthenticationError` (401) | Missing, unknown or revoked key |
 | `PermissionDeniedError` (403) | The key lacks the scope |
-| `PayloadTooLargeError` (413) | Body over 1 MB or 100 items |
+| `PayloadTooLargeError` (413) | Body over 1 MB |
 | `RateLimitError` (429) | `.code` is `rate_limited` or `quota_exceeded`; `.retry_after` in seconds |
 | `InternalServerError` (5xx) | Server error |
 | `APIConnectionError` / `APITimeoutError` | No response |
@@ -126,17 +120,18 @@ Each retry is logged at `INFO` on the `rhyme` logger, with the error and its req
 
 ## Testing
 
-`rhyme.testing.FakeRhyme` has the same methods as `Rhyme`. It keeps everything in memory and applies the API's upsert rules: created / updated / stale / rejected, set-once fields, metadata merging, and text trimming (blank text is stored as `None`). It doesn't model truncation, PII redaction, workflow and intent linking, rate limits or quotas.
+`rhyme.testing.FakeRhyme` has the same methods as `Rhyme`, but sends nothing. It builds each request body exactly as `Rhyme` would and records it, then returns every item as `created`. It doesn't model the API: nothing is stored, merged or rejected.
 
 ```python
 from rhyme.testing import FakeRhyme
 
 fake = FakeRhyme()
 my_agent.run(rhyme=fake)
-assert fake.activities["zendesk:4822:1"]["status"] == "done"
+assert fake.posted[-1]["status"] == "done"  # activities in API (camelCase) field names
+assert len(fake.batches) == 1  # one entry per post call
 ```
 
-Set `fake.error` to an exception to make the next call raise it. `rhyme.testing.AsyncFakeRhyme` does the same for `AsyncRhyme`.
+Set `fake.error` to an exception to make the next call raise it, or `fake.result` to an `ActivityBatchResult` to make the next post return it (to test how your code handles rejected items, say). `fake.me_calls` counts `me()` calls. `rhyme.testing.AsyncFakeRhyme` does the same for `AsyncRhyme`.
 
 Type your own code against the `RhymeClient` protocol (or `AsyncRhymeClient`), so it accepts either the real client or the fake:
 

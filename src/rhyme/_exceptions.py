@@ -66,7 +66,7 @@ class NotFoundError(APIStatusError):
 
 
 class PayloadTooLargeError(APIStatusError):
-    """413: the body is over the size or item limit."""
+    """413: the body is over 1 MB; split the batch."""
 
 
 class UnsupportedMediaTypeError(APIStatusError):

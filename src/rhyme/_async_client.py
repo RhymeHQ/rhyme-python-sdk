@@ -1,9 +1,9 @@
 from __future__ import annotations
 
+import asyncio
 from collections.abc import Awaitable, Callable, Iterable
 from typing import Any, Protocol
 
-import anyio
 import httpx2
 
 from ._base_client import (
@@ -41,7 +41,7 @@ class AsyncRhyme(BaseClient):
         timeout: float = DEFAULT_TIMEOUT,
         max_retries: int = DEFAULT_MAX_RETRIES,
         http_client: httpx2.AsyncClient | None = None,
-        sleep: Callable[[float], Awaitable[None]] = anyio.sleep,
+        sleep: Callable[[float], Awaitable[None]] = asyncio.sleep,
     ) -> None:
         super().__init__(api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries)
         self._owns_http = http_client is None

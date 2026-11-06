@@ -412,7 +412,6 @@ name = "rhyme-sdk"
 version = "0.1.0"
 source = { editable = "." }
 dependencies = [
-    { name = "anyio" },
     { name = "httpx2" },
     { name = "pydantic" },
 ]
@@ -427,7 +426,6 @@ dev = [
 
 [package.metadata]
 requires-dist = [
-    { name = "anyio", specifier = ">=4" },
     { name = "httpx2", specifier = ">=2,<3" },
     { name = "pydantic", specifier = ">=2.11,<3" },
 ]

@@ -29,4 +29,4 @@ def test_fake_usable_where_client_expected():
 def test_async_fake_usable_where_client_expected():
     fake = AsyncFakeRhyme()
     assert asyncio.run(_async_report(fake)) == "created"
-    assert fake.activities["t1"]["status"] == "done"
+    assert fake.posted[0]["status"] == "done"

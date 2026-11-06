@@ -8,7 +8,7 @@ from .types import MAX_BATCH, ActivityBatchResult
 if TYPE_CHECKING:
     from ._base_client import ActivityInput
 
-# Errors a smaller batch can fix: a body over the size limit, more items than the key allows, or (locally) an item
+# Errors a smaller batch can fix: a body over 1 MB (413), a body the API refuses as invalid (400), or (locally) an item
 # that can't be serialised. A single item that still fails is dropped, since it would block the buffer forever.
 _SPLITTABLE = (BadRequestError, PayloadTooLargeError, TypeError, ValueError)
 
