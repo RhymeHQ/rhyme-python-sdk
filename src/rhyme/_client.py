@@ -13,11 +13,13 @@ from ._base_client import (
     BaseClient,
     activity_payloads,
     json_body,
+    only_result,
     parse_body,
     status_error,
     transport_error,
 )
-from .types import ActivityBatchResult, ActivityResult, Me
+from ._post_all import post_all
+from .types import MAX_BATCH, ActivityBatchResult, ActivityResult, Me, PostAllResult
 
 
 class RhymeClient(Protocol):
@@ -28,6 +30,8 @@ class RhymeClient(Protocol):
     def post_activities(self, activities: Iterable[ActivityInput]) -> ActivityBatchResult: ...
 
     def post_activity(self, activity: ActivityInput) -> ActivityResult: ...
+
+    def post_all(self, activities: Iterable[ActivityInput], *, max_items: int = MAX_BATCH) -> PostAllResult: ...
 
 
 class Rhyme(BaseClient):
@@ -70,7 +74,15 @@ class Rhyme(BaseClient):
 
     def post_activity(self, activity: ActivityInput) -> ActivityResult:
         """Upsert one activity and return its item result."""
-        return self.post_activities([activity]).results[0]
+        return only_result(self.post_activities([activity]))
+
+    def post_all(self, activities: Iterable[ActivityInput], *, max_items: int = MAX_BATCH) -> PostAllResult:
+        """Post any number of activities, `max_items` per request; see `PostAllResult` and `PostAllError`.
+
+        A batch the API refuses as too large (413) or invalid (400) is split in half and retried; an activity it still
+        refuses on its own is skipped and returned in `dropped`. Any other error raises `PostAllError`.
+        """
+        return post_all(self.post_activities, activities, max_items)
 
     def _request(self, method: str, path: str, body: Any = None) -> Any:
         attempt = 0

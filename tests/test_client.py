@@ -178,6 +178,38 @@ def test_long_retry_after_not_waited(make_client, sleeps):
     assert sleeps == []
 
 
+@pytest.mark.parametrize(
+    ("body", "headers"),
+    [
+        ({"code": "rate_limited", "retryAfter": "abc"}, {}),
+        ({"code": "rate_limited", "retryAfter": -5}, {}),
+        ({"code": "rate_limited", "retryAfter": True}, {}),
+        ({"code": "rate_limited"}, {"Retry-After": "Wed, 21 Oct 2026 07:28:00 GMT"}),
+    ],
+)
+def test_malformed_retry_after_ignored(make_client, sleeps, body, headers):
+    client, _ = make_client(respond(429, body, headers=headers), respond(200, batch_body("created")))
+    assert client.post_activity(_activity()).result == "created"
+    assert len(sleeps) == 1 and sleeps[0] <= 0.5  # jittered backoff, not the bad value
+
+
+def test_retry_after_from_body_is_parsed_from_string_and_float(make_client, sleeps):
+    client, _ = make_client(
+        respond(429, {"code": "rate_limited", "retryAfter": "4"}),
+        respond(429, {"code": "rate_limited", "retryAfter": 1.2}),
+        respond(200, batch_body("created")),
+    )
+    client.post_activity(_activity())
+    assert sleeps == [4.0, 2.0]
+
+
+@pytest.mark.parametrize("results", [(), ("created", "created")])
+def test_post_activity_needs_exactly_one_result(make_client, results):
+    client, _ = make_client(respond(200, batch_body(*results)))
+    with pytest.raises(RhymeError, match="results for 1 activity"):
+        client.post_activity(_activity())
+
+
 def test_server_error_retried_then_raised(make_client, sleeps):
     client, transport = make_client(*[respond(500, {"code": "internal_error"}, headers={"X-Request-Id": "r"})] * 3)
     with pytest.raises(InternalServerError) as exc:

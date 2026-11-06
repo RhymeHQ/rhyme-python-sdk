@@ -2,12 +2,16 @@
 
 from __future__ import annotations
 
+from dataclasses import dataclass, field
 from datetime import date, datetime
 from enum import StrEnum
-from typing import Any, Literal, Self
+from typing import TYPE_CHECKING, Any, Literal, Self
 
 from pydantic import AwareDatetime, BaseModel, ConfigDict, Field, field_validator, model_validator
 from pydantic.alias_generators import to_camel
+
+if TYPE_CHECKING:
+    from ._base_client import ActivityInput
 
 MAX_BATCH = 100
 # The server stores integers as Postgres `integer`.
@@ -66,8 +70,6 @@ def _not_null(*fields: str) -> Any:
 
 
 ActivityStatusName = Literal["done", "pending", "handed_over", "failed"]
-
-FINAL_STATUSES = frozenset({ActivityStatus.DONE, ActivityStatus.HANDED_OVER})
 
 
 class ActivityRequest(_Request):
@@ -223,6 +225,26 @@ class ActivityBatchResult(_Response):
     @property
     def rejected(self) -> list[ActivityResult]:
         return [r for r in self.results if not r.ok]
+
+
+@dataclass(frozen=True)
+class DroppedActivity:
+    """An activity `post_all` gave up on: the API refused it on its own (400 or 413), or it isn't JSON-serialisable."""
+
+    activity: ActivityInput
+    error: Exception
+
+
+@dataclass(frozen=True)
+class PostAllResult:
+    """What `post_all` did: one `ActivityBatchResult` per request, in order, and the activities it dropped.
+
+    Each batch's `index` values count from 0 within that batch. Items the API rejected individually are in each batch's
+    `rejected`, as with `post_activities`.
+    """
+
+    batch_results: list[ActivityBatchResult] = field(default_factory=list)
+    dropped: list[DroppedActivity] = field(default_factory=list)
 
 
 class MeAgent(_Response):

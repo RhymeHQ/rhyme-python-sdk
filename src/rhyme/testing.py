@@ -13,7 +13,8 @@ from collections.abc import Iterable
 from datetime import UTC, datetime
 from typing import Any
 
-from ._base_client import ActivityInput, activity_payloads
+from ._base_client import ActivityInput, activity_payloads, only_result
+from ._post_all import apost_all, post_all
 from .types import (
     MAX_BATCH,
     ActivityBatchResult,
@@ -24,6 +25,7 @@ from .types import (
     MeKey,
     MeLimits,
     MeUsage,
+    PostAllResult,
     ResolvedLinks,
 )
 
@@ -103,7 +105,10 @@ class FakeRhyme(_Recorder):
         return self._post(activities)
 
     def post_activity(self, activity: ActivityInput) -> ActivityResult:
-        return self._post([activity]).results[0]
+        return only_result(self._post([activity]))
+
+    def post_all(self, activities: Iterable[ActivityInput], *, max_items: int = MAX_BATCH) -> PostAllResult:
+        return post_all(self.post_activities, activities, max_items)
 
 
 class AsyncFakeRhyme(_Recorder):
@@ -116,4 +121,7 @@ class AsyncFakeRhyme(_Recorder):
         return self._post(activities)
 
     async def post_activity(self, activity: ActivityInput) -> ActivityResult:
-        return self._post([activity]).results[0]
+        return only_result(self._post([activity]))
+
+    async def post_all(self, activities: Iterable[ActivityInput], *, max_items: int = MAX_BATCH) -> PostAllResult:
+        return await apost_all(self.post_activities, activities, max_items)

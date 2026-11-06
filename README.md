@@ -68,31 +68,36 @@ You can also pass plain dicts in API field names (`{"externalId": ..., "status":
 
 ### Batching
 
-`ActivityBuffer` posts full batches as you add activities, and the rest when it's flushed or its `with` block exits cleanly. Threads can share one buffer: only one batch is posted at a time, and each item is posted once.
+`post_activities` takes up to 100 activities per call. To send more, use `post_all`. It posts them in order, in batches of up to 100:
 
 ```python
-from rhyme import ActivityBuffer
-
-with ActivityBuffer(client) as buffer:
-    for activity in activities:
-        buffer.add(activity)
+result = client.post_all(activities)  # or: await client.post_all(...) with AsyncRhyme
+for batch in result.batch_results:
+    for item in batch.rejected:
+        print(item.external_id, item.error.code)
+for d in result.dropped:
+    print("dropped", d.activity, d.error)
 ```
 
-With `AsyncRhyme`, use `AsyncActivityBuffer`. Tasks on the same event loop can share one buffer: only one batch is posted at a time, and each item is posted once.
+- If the API refuses a batch as too large (413) or invalid (400), `post_all` splits it and posts the halves. An activity it still refuses on its own is skipped and returned in `result.dropped` with its error, so one bad item can't block the rest. A plain dict that can't be serialised to JSON is handled the same way.
+- On any other error (network, 5xx, rate limits, auth), it stops and raises `rhyme.PostAllError`. The underlying error is its `__cause__`. `.batch_results` and `.dropped` describe what happened before it stopped, and `.unsent` holds every activity not yet posted, in order, so you can retry exactly those. Activities upsert by `externalId`, so resending one is safe.
 
 ```python
-from rhyme import AsyncActivityBuffer
+from rhyme import PostAllError
 
-async with AsyncActivityBuffer(client) as buffer:
-    for activity in activities:
-        await buffer.add(activity)
+try:
+    client.post_all(activities)
+except PostAllError as e:
+    save_for_later(e.unsent)
 ```
 
-When a post fails, `add()` and `flush()` raise `rhyme.FlushError`. The underlying error is its `__cause__`, and `.results` holds the batches that flush did post.
+A key can have a lower per-request limit than 100 (see `GET /me`). Pass it as `max_items`:
 
-- If the API refuses a batch as too large (413) or invalid (400), the buffer splits it and posts the halves. An activity it still refuses on its own is removed from the buffer and returned in `.dropped`, so one bad item can't block the rest. A plain dict that can't be serialised to JSON is handled the same way.
-- On any other error (network, 5xx, rate limits, auth), nothing is dropped. The unsent activities stay buffered for the next flush.
-- If the `with` block raises, the buffer doesn't flush. The unsent activities stay in it (`len(buffer)`), so you can flush them yourself.
+```python
+client.post_all(activities, max_items=client.me().limits.max_items)
+```
+
+`post_all` keeps nothing between calls. To collect activities as they happen and send them in batches, keep your own list (or queue) and pass it to `post_all` when it's full or on a timer.
 
 ## Errors and retries
 

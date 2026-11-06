@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import math
 import os
 import random
 from collections.abc import Iterable, Mapping
@@ -21,7 +22,7 @@ from ._exceptions import (
     RhymeError,
     status_error_class,
 )
-from .types import MAX_BATCH, Activity, ItemError
+from .types import MAX_BATCH, Activity, ActivityBatchResult, ActivityResult, ItemError
 
 logger = logging.getLogger("rhyme")
 
@@ -127,6 +128,25 @@ def parse_body[M: BaseModel](model: type[M], data: Any, method: str, path: str) 
         raise RhymeError(f"{method} {path} returned an unexpected body") from e
 
 
+def only_result(batch: ActivityBatchResult) -> ActivityResult:
+    """The item result of a one-activity post."""
+    if len(batch.results) != 1:
+        raise RhymeError(f"POST /activities returned {len(batch.results)} results for 1 activity")
+    return batch.results[0]
+
+
+def _retry_after(value: Any) -> int | None:
+    """Seconds from a `retryAfter` field or `Retry-After` header; None if missing or not a non-negative number."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str):
+        value = value.strip()
+        return int(value) if value.isdigit() else None
+    if isinstance(value, int | float) and value >= 0 and value != float("inf"):
+        return math.ceil(value)
+    return None
+
+
 def _item_errors(raw: Any) -> list[ItemError]:
     errors = []
     for d in raw if isinstance(raw, list) else []:
@@ -143,10 +163,9 @@ def status_error(resp: httpx2.Response) -> APIStatusError:
     except ValueError:
         body = None
     data = body if isinstance(body, dict) else {}
-    retry_after = data.get("retryAfter")
+    retry_after = _retry_after(data.get("retryAfter"))
     if retry_after is None:
-        header = resp.headers.get("Retry-After", "")
-        retry_after = int(header) if header.isdigit() else None
+        retry_after = _retry_after(resp.headers.get("Retry-After"))
     details = _item_errors(data.get("details"))
     return status_error_class(resp.status_code)(
         data.get("error") or resp.reason_phrase or "request failed",

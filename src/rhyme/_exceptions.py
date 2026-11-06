@@ -6,6 +6,7 @@ from .types import ActivityBatchResult, ItemError
 
 if TYPE_CHECKING:
     from ._base_client import ActivityInput
+    from .types import DroppedActivity
 
 
 class RhymeError(Exception):
@@ -81,19 +82,25 @@ class InternalServerError(APIStatusError):
     """5xx: safe to retry, since activities upsert by `externalId`."""
 
 
-class FlushError(RhymeError):
-    """An activity buffer couldn't post everything; the underlying error is `__cause__`.
+class PostAllError(RhymeError):
+    """`post_all` stopped on an error splitting can't fix (network, 5xx, 429, auth); the error is `__cause__`.
 
-    `results` holds the batches this flush did post. `dropped` holds activities removed from the buffer because the
-    API will never accept them (a 400 or 413 for that item alone); everything else stays buffered for the next flush.
+    `batch_results` and `dropped` are as in `PostAllResult`, for what happened before it stopped. `unsent` holds every
+    activity neither posted nor dropped, in input order, so you can retry exactly those.
     """
 
     def __init__(
-        self, message: str, *, results: list[ActivityBatchResult], dropped: list[ActivityInput] | None = None
+        self,
+        message: str,
+        *,
+        batch_results: list[ActivityBatchResult],
+        dropped: list[DroppedActivity],
+        unsent: list[ActivityInput],
     ) -> None:
         super().__init__(message)
-        self.results = results
-        self.dropped = dropped or []
+        self.batch_results = batch_results
+        self.dropped = dropped
+        self.unsent = unsent
 
 
 _BY_STATUS: dict[int, type[APIStatusError]] = {

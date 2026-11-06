@@ -1,9 +1,7 @@
 """Python client for the Rhyme Agent API."""
 
-from ._async_buffer import AsyncActivityBuffer
 from ._async_client import AsyncRhyme, AsyncRhymeClient
 from ._base_client import DEFAULT_MAX_RETRIES, DEFAULT_TIMEOUT
-from ._buffer import ActivityBuffer
 from ._client import Rhyme, RhymeClient
 from ._exceptions import (
     APIConnectionError,
@@ -11,11 +9,11 @@ from ._exceptions import (
     APITimeoutError,
     AuthenticationError,
     BadRequestError,
-    FlushError,
     InternalServerError,
     NotFoundError,
     PayloadTooLargeError,
     PermissionDeniedError,
+    PostAllError,
     RateLimitError,
     RhymeError,
     UnsupportedMediaTypeError,
@@ -28,10 +26,12 @@ from .types import (
     ActivityResult,
     ActivityStatus,
     BatchCounts,
+    DroppedActivity,
     ItemError,
     ItemWarning,
     Me,
     ModelUsage,
+    PostAllResult,
     Reference,
     ResolvedLinks,
     StepRef,
@@ -48,17 +48,15 @@ __all__ = [
     "APITimeoutError",
     "Activity",
     "ActivityBatchResult",
-    "ActivityBuffer",
     "ActivityRequest",
     "ActivityResult",
     "ActivityStatus",
-    "AsyncActivityBuffer",
     "AsyncRhyme",
     "AsyncRhymeClient",
     "AuthenticationError",
     "BadRequestError",
     "BatchCounts",
-    "FlushError",
+    "DroppedActivity",
     "InternalServerError",
     "ItemError",
     "ItemWarning",
@@ -67,6 +65,8 @@ __all__ = [
     "NotFoundError",
     "PayloadTooLargeError",
     "PermissionDeniedError",
+    "PostAllError",
+    "PostAllResult",
     "RateLimitError",
     "Reference",
     "ResolvedLinks",
