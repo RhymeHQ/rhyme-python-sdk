@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.1.0 (unreleased)
+## 0.1.0 (2026-11-05)
 
 - First release: `Rhyme` and `AsyncRhyme` clients for `GET /me` and `POST /activities`, built on HTTPX2. Typed models, retries with `Retry-After`, `post_all` for posting any number of activities in batches, `rhyme.testing.FakeRhyme` and `AsyncFakeRhyme`, and the `RhymeClient` and `AsyncRhymeClient` protocols that the real and fake clients satisfy.
 - Models refuse an explicit `None` on fields the API can't store as null, and integers above 2³¹−1.
