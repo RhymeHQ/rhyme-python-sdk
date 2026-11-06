@@ -1,0 +1,94 @@
+from __future__ import annotations
+
+from collections.abc import Awaitable, Callable, Iterable
+from typing import Any, Protocol
+
+import anyio
+import httpx2
+
+from ._base_client import (
+    DEFAULT_MAX_RETRIES,
+    DEFAULT_TIMEOUT,
+    ActivityInput,
+    BaseClient,
+    activity_payloads,
+    json_body,
+    parse_body,
+    status_error,
+    transport_error,
+)
+from .types import ActivityBatchResult, ActivityResult, Me
+
+
+class AsyncRhymeClient(Protocol):
+    """What `AsyncRhyme` and `rhyme.testing.AsyncFakeRhyme` both provide; annotate with this to accept either."""
+
+    async def me(self) -> Me: ...
+
+    async def post_activities(self, activities: Iterable[ActivityInput]) -> ActivityBatchResult: ...
+
+    async def post_activity(self, activity: ActivityInput) -> ActivityResult: ...
+
+
+class AsyncRhyme(BaseClient):
+    """Async client for the Rhyme Agent API (`GET /me`, `POST /activities`)."""
+
+    def __init__(
+        self,
+        *,
+        api_key: str | None = None,
+        base_url: str | None = None,
+        timeout: float = DEFAULT_TIMEOUT,
+        max_retries: int = DEFAULT_MAX_RETRIES,
+        http_client: httpx2.AsyncClient | None = None,
+        sleep: Callable[[float], Awaitable[None]] = anyio.sleep,
+    ) -> None:
+        super().__init__(api_key=api_key, base_url=base_url, timeout=timeout, max_retries=max_retries)
+        self._owns_http = http_client is None
+        self._http = http_client or httpx2.AsyncClient()
+        self._sleep = sleep
+
+    async def __aenter__(self) -> AsyncRhyme:
+        return self
+
+    async def __aexit__(self, *exc: object) -> None:
+        await self.aclose()
+
+    async def aclose(self) -> None:
+        """Close the HTTP client, unless it was passed in."""
+        if self._owns_http:
+            await self._http.aclose()
+
+    async def me(self) -> Me:
+        """Describe the calling key, its limits and today's usage; a good smoke test for a new key."""
+        return parse_body(Me, await self._request("GET", "/me"), "GET", "/me")
+
+    async def post_activities(self, activities: Iterable[ActivityInput]) -> ActivityBatchResult:
+        """Upsert 1–100 activities. Rejected items come back in the result, not as an exception."""
+        body = {"activities": activity_payloads(activities)}
+        return parse_body(ActivityBatchResult, await self._request("POST", "/activities", body), "POST", "/activities")
+
+    async def post_activity(self, activity: ActivityInput) -> ActivityResult:
+        """Upsert one activity and return its item result."""
+        return (await self.post_activities([activity])).results[0]
+
+    async def _request(self, method: str, path: str, body: Any = None) -> Any:
+        attempt = 0
+        while True:
+            try:
+                resp = await self._http.request(
+                    method, f"{self.base_url}{path}", json=body, headers=self._headers, timeout=self.timeout
+                )
+            except httpx2.RequestError as e:
+                err = transport_error(method, path, e)
+            else:
+                if resp.is_success:
+                    return json_body(method, path, resp)
+                err = status_error(resp)
+
+            delay = self._retry_delay(err, attempt)
+            if delay is None:
+                raise err
+            self._log_retry(method, path, delay, attempt, err)
+            await self._sleep(delay)
+            attempt += 1
