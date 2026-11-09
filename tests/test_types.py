@@ -5,7 +5,17 @@ from datetime import UTC, datetime
 import pytest
 from pydantic import ValidationError
 
-from rhyme import Activity, ActivityRequest, ActivityResult, ModelUsage, Reference, StepRef, ToolCall, WorkflowRef
+from rhyme import (
+    Activity,
+    ActivityRequest,
+    ActivityResult,
+    ActivityStatus,
+    ModelUsage,
+    Reference,
+    StepRef,
+    ToolCall,
+    WorkflowRef,
+)
 from rhyme.types import INT32_MAX
 
 
@@ -43,6 +53,11 @@ def test_activity_rejects_unknown_fields_and_bad_ids():
         Activity(external_id="has space", status="done")
     with pytest.raises(ValidationError):
         Activity(external_id="a", status="done", action="DraftReply")
+
+
+def test_no_action_status():
+    assert Activity(external_id="a", status=ActivityStatus.NO_ACTION).to_api()["status"] == "no_action"
+    assert Activity.model_validate({"externalId": "a", "status": "no_action"}).status == ActivityStatus.NO_ACTION
 
 
 def test_activity_accepts_camel_case_input():

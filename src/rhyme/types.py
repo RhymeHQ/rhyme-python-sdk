@@ -53,6 +53,7 @@ class ActivityStatus(StrEnum):
     PENDING = "pending"
     HANDED_OVER = "handed_over"
     FAILED = "failed"
+    NO_ACTION = "no_action"
 
 
 def _not_null(*fields: str) -> Any:
@@ -69,7 +70,7 @@ def _not_null(*fields: str) -> Any:
     return field_validator(*fields, mode="before")(check)
 
 
-ActivityStatusName = Literal["done", "pending", "handed_over", "failed"]
+ActivityStatusName = Literal["done", "pending", "handed_over", "failed", "no_action"]
 
 
 class ActivityRequest(_Request):

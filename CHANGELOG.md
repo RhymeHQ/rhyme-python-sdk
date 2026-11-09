@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.1 (2026-11-09)
+
+- New activity status `no_action` (`ActivityStatus.NO_ACTION`), for a turn where the agent decided to do nothing.
+
 ## 0.1.0 (2026-11-05)
 
 - First release: `Rhyme` and `AsyncRhyme` clients for `GET /me` and `POST /activities`, built on HTTPX2. Typed models, retries with `Retry-After`, `post_all` for posting any number of activities in batches, `rhyme.testing.FakeRhyme` and `AsyncFakeRhyme`, and the `RhymeClient` and `AsyncRhymeClient` protocols that the real and fake clients satisfy.
