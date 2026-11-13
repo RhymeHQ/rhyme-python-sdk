@@ -54,7 +54,7 @@ Both clients use [HTTPX2](https://github.com/pydantic/httpx2). To configure prox
 
 - A field you **don't set** keeps its stored value.
 - Setting a field to **`None`** clears it. That works for the text fields (`requester`, `ask`, `summary`, `outcome`, `escalation_reason`, `output`), `duration_ms`, `usage`, `tools` and a reference's `url`. Every other field can't be null: `Activity(action=None)` raises `ValueError`, so leave the field unset instead.
-- `request`, `occurred_at`, `workflow`, `step` and `intent` are set once. A later, different value is ignored with an `immutable_field_ignored` warning. `metadata` is merged into the stored metadata.
+- `request`, `occurred_at`, `workflow`, `step`, `intent` and `mode` are set once. A later, different value is ignored with an `immutable_field_ignored` warning. `metadata` is merged into the stored metadata.
 - `done` and `handed_over` are final. A later `pending` or `failed` comes back with result `stale`, and nothing is written.
 - A batch is 1–100 activities. Each item gets its own result, so a `200` can still contain rejected items:
 
@@ -65,6 +65,29 @@ for item in batch.rejected:
 ```
 
 You can also pass plain dicts in API field names (`{"externalId": ..., "status": ...}`). They are sent as given, without validation.
+
+### Shadow mode
+
+Set `mode="shadow"` when the agent runs on a ticket without acting on it, for example replaying last month's cases. Send the same activity it would send live, with `action` and `output` saying what it would have done. Shadow activities stay out of Live Activity and its totals; reviewers mark them correct or incorrect in the Evaluator. `mode` defaults to `live`.
+
+```python
+from rhyme import Activity, ActivityMode, ActivityRequest, StepRef, WorkflowRef
+
+client.post_activity(
+    Activity(
+        external_id="zendesk:4821:triage",
+        status="done",
+        mode=ActivityMode.SHADOW,
+        action="escalate",
+        output="Escalated to Tier 2: refund over the £200 limit",
+        request=ActivityRequest(source="zendesk", id="4821"),
+        workflow=WorkflowRef(key="triage"),
+        step=StepRef(key="escalate"),
+    )
+)
+```
+
+A server older than this SDK ignores `mode` with an `unknown_field` warning and stores the activity as live.
 
 ### Batching
 
