@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from rhyme import (
     Activity,
+    ActivityMode,
     ActivityRequest,
     ActivityResult,
     ActivityStatus,
@@ -53,6 +54,16 @@ def test_activity_rejects_unknown_fields_and_bad_ids():
         Activity(external_id="has space", status="done")
     with pytest.raises(ValidationError):
         Activity(external_id="a", status="done", action="DraftReply")
+
+
+def test_shadow_mode():
+    assert Activity(external_id="a", status="done", mode=ActivityMode.SHADOW).to_api()["mode"] == "shadow"
+    assert Activity(external_id="a", status="done", mode="live").mode == ActivityMode.LIVE
+    assert "mode" not in Activity(external_id="a", status="done").to_api()
+    with pytest.raises(ValidationError):
+        Activity.model_validate({"externalId": "a", "status": "done", "mode": "replay"})
+    with pytest.raises(ValidationError):
+        Activity(external_id="a", status="done", mode=None)
 
 
 def test_no_action_status():

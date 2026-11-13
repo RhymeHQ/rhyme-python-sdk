@@ -56,6 +56,13 @@ class ActivityStatus(StrEnum):
     NO_ACTION = "no_action"
 
 
+class ActivityMode(StrEnum):
+    """`shadow` is a dry run: the agent records what it would have done, and Rhyme keeps it out of Live Activity."""
+
+    LIVE = "live"
+    SHADOW = "shadow"
+
+
 def _not_null(*fields: str) -> Any:
     """A validator for fields the API treats as optional but not nullable: leave them unset rather than `None`.
 
@@ -71,6 +78,7 @@ def _not_null(*fields: str) -> Any:
 
 
 ActivityStatusName = Literal["done", "pending", "handed_over", "failed", "no_action"]
+ActivityModeName = Literal["live", "shadow"]
 
 
 class ActivityRequest(_Request):
@@ -154,6 +162,7 @@ class Activity(_Request):
 
     external_id: str = Field(pattern=r"^[A-Za-z0-9._:-]{1,200}$")
     status: ActivityStatus | ActivityStatusName
+    mode: ActivityMode | ActivityModeName | None = None
     action: str | None = Field(default=None, pattern=r"^[a-z][a-z0-9_]{0,63}$")
     occurred_at: AwareDatetime | None = None
     request: ActivityRequest | None = None
@@ -172,7 +181,9 @@ class Activity(_Request):
     tools: list[ToolCall] | None = Field(default=None, max_length=500)
     metadata: dict[str, MetadataValue] | None = None
 
-    _reject_null = _not_null("action", "occurred_at", "request", "workflow", "step", "intent", "references", "metadata")
+    _reject_null = _not_null(
+        "mode", "action", "occurred_at", "request", "workflow", "step", "intent", "references", "metadata"
+    )
 
 
 class ItemWarning(_Response):

@@ -1,5 +1,9 @@
 # Changelog
 
+## 0.1.2 (2026-11-13)
+
+- New activity field `mode` (`ActivityMode.LIVE` or `ActivityMode.SHADOW`), set once. A shadow activity records what the agent would have done; it stays out of Live Activity and is reviewed in the Evaluator.
+
 ## 0.1.1 (2026-11-09)
 
 - New activity status `no_action` (`ActivityStatus.NO_ACTION`), for a turn where the agent decided to do nothing.
